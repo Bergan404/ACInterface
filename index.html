@@ -46,7 +46,8 @@
     </div>
 
     <div class="reset_environment" style="display: none;">
-        <a href="file:///C:/Users/oudb/Coding/access_control/index.html">Reset Environment</a>
+        <a onclick="resetAuth()" href="file:///C:/Users/oudb/Coding/access_control/index.html">Reset Environment</a>
+        <p id="tokenTimer">Token expires in: --</p>
     </div>
 
     <div class="api_selections" style="display: none;">
@@ -68,6 +69,14 @@
 
         <div class="ticket_selection">
             <h2>All Ticket Selection</h2>
+            <label for="ticketType">Ticket Type</label>
+            <select id="ticketType">
+                <option value="GRAY">GRAY</option>
+                <option value="BLACK">BLACK</option>
+                <option value="WHITE">WHITE</option>
+            </select>
+            <br>
+            <br>
             <label for="ticketDropdown">Select Ticket:</label>
             <select id="ticketDropdown">
                 <option value="">Select Ticket...</option>
@@ -97,6 +106,10 @@
         let selectedSeasonGlobal = null;
         let selectedEventGlobal = null;
 
+        function resetAuth() {
+            localStorage.setItem("Authorized", "FALSE");
+        }
+
         function selectEnvironment() {
             const environmentDropdown = document.querySelector('#environment');
 
@@ -104,6 +117,18 @@
             console.log("Selected Environment: " + selectedEnvironment);
 
             environmentDropdown.addEventListener('change', async (e) => {
+                const selectedEnvironment = e.target.value;
+                console.log("Selected Environment: " + selectedEnvironment);
+            });
+        }
+
+        function ticketTypeSelector() {
+            const ticketTypeDropdown = document.querySelector('#ticketType');
+
+            const selectedEnvironment = ticketTypeDropdown.value;
+            console.log("Selected Environment: " + selectedEnvironment);
+
+            ticketTypeDropdown.addEventListener('change', async (e) => {
                 const selectedEnvironment = e.target.value;
                 console.log("Selected Environment: " + selectedEnvironment);
             });
@@ -117,14 +142,21 @@
         window.onload = function () {
             const token = getTokenFromUrl();
             localStorage.setItem("jwtToken", token);
+            const auth = localStorage.getItem("Authorized");
+
+            const tokenPayload = JSON.parse(atob(token.split(".")[1]));
+            const expirationTime = tokenPayload.exp * 1000;
+            localStorage.setItem("jwtExpiration", expirationTime);
 
             if (token) {
                 console.log("Using existing token from URL:", token);
                 checkAPIConnection();
+                startTokenCountdown();
                 fetchSeasons();
                 selectedSeason();
                 selectedEvent();
                 selectedTickets();
+                ticketTypeSelector();
             } else {
                 console.log("No token found in URL. Generate a new one by submitting environment.");
                 selectEnvironment();
@@ -134,9 +166,38 @@
                 document.querySelectorAll('.set_institution_operator').forEach(el => el.style.display = 'none');
                 document.querySelector('.reset_environment').style.display = 'block';
                 document.querySelector('.api_selections').style.display = 'block';
+            }
+
+            if (auth === "TRUE") {
                 document.getElementById("loader").style.display = 'none';
             }
+
         };
+
+        function startTokenCountdown() {
+            const expirationTime = localStorage.getItem("jwtExpiration");
+
+            if (!expirationTime) return;
+
+            function updateCountdown() {
+                const now = Date.now();
+                const remainingTime = expirationTime - now;
+
+                if (remainingTime <= 0) {
+                    document.getElementById("tokenTimer").textContent = "Token Expired!";
+                    clearInterval(countdownInterval);
+                    return;
+                }
+
+                const minutes = Math.floor(remainingTime / 60000);
+                const seconds = Math.floor((remainingTime % 60000) / 1000);
+
+                document.getElementById("tokenTimer").textContent = `Token expires in: ${minutes}m ${seconds}s`;
+            }
+
+            updateCountdown();
+            const countdownInterval = setInterval(updateCountdown, 1000);
+        }
 
         async function submitEnvironment() {
             const institution = document.getElementById("institutionCode").value;
@@ -198,6 +259,7 @@
 
                 const result = await response.json();
                 console.log("Connection Successful:", result);
+                localStorage.setItem("Authorized", "TRUE");
 
                 const successMessage = document.createElement("p");
                 successMessage.classList.add("success_message");
