@@ -1,0 +1,84 @@
+input[type="text"]{
+    
+}
+
+body {
+    margin: 20px;
+}
+
+a {
+    border: 1px solid black;
+    text-decoration: none;
+    padding: 8px;
+    color: black;
+}
+
+.retry {
+    border: none;
+    text-decoration: none;
+    padding: 8px;
+    color: black;
+    background-color: red; 
+}
+
+.proceed {
+    border: none;
+    text-decoration: none;
+    padding: 8px;
+    color: black;
+    background-color: green;
+}
+
+.set_institution_operator {
+    border-bottom: 2px solid black;
+    text-align: center;
+}
+
+.loader {
+    background-color: #4c4c4c;
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+/* .spinner {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 50px;
+    height: 50px;
+    border: 5px solid #f3f3f3;
+    border-top: 5px solid #3498db;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+} */
+
+.info {
+    position: absolute;
+    height: 100%;
+    top: 50%;
+    left: 0;
+    right: 0;
+    margin: auto;
+    text-align: center;
+}
+
+.error_message {
+    color: red;
+    font-size: 20px;
+    font-weight: 600;
+}
+
+.success_message {
+    color: green;
+    font-size: 20px;
+    font-weight: 600;
+}
+
+@keyframes spin {
+    0% { transform: translate(-50%, -50%) rotate(0deg); }
+    100% { transform: translate(-50%, -50%) rotate(360deg); }
+}

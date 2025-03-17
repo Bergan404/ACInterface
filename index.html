@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Integration</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="set_institution_operator">
+        <div class="set_institution">
+            <h2>Set the Institution code</h2>
+            <input type="text" id="institutionCode" placeholder="Enter Institution">
+        </div>
+
+        <div class="set_operator">
+            <h2>Set the Operator</h2>
+            <input type="text" id="operatorCode" placeholder="Enter Operator">
+        </div>
+
+        <div class="set_password">
+            <h2>Password</h2>
+            <input type="text" id="passwordCode" placeholder="Enter Password">
+        </div>
+
+        <div class="set_environment">
+            <h2>Select Environment</h2>
+            <select name="environment" id="environment">
+                <option value="pp">PPROD</option>
+                <option value="demo">DEMO</option>
+            </select>
+        </div>
+
+        <br>
+
+        <button class="button" onclick="submitEnvironment()">Submit</button>
+
+        <p id="responseMessage"></p>
+    </div>
+
+    <div id="loader" class="loader" style="display: none;">
+        <div class="spinner" id="spinner"></div>
+        <div class="info" id="info"></div>
+    </div>
+
+    <div class="reset_environment" style="display: none;">
+        <a href="file:///C:/Users/oudb/Coding/access_control/index.html">Reset Environment</a>
+    </div>
+
+    <div class="api_selections" style="display: none;">
+        <div class="season_selection">
+            <h2>Season Selection</h2>
+            <label for="seasonDropdown">Select Season:</label>
+            <select id="seasonDropdown">
+                <option>Select Season...</option>
+            </select>
+        </div>
+
+        <div class="product_selection">
+            <h2>Event Selection</h2>
+            <label for="productDropdown">Select Event:</label>
+            <select id="productDropdown">
+                <option>Select Event...</option>
+            </select>
+        </div>
+
+        <div class="ticket_selection">
+            <h2>All Ticket Selection</h2>
+            <label for="ticketDropdown">Select Ticket:</label>
+            <select id="ticketDropdown">
+                <option value="">Select Ticket...</option>
+            </select>
+        </div>
+
+        <div class="ticket_information">
+            <h2>Ticket Information</h2>
+            <div id="ticketDetails">
+                <p id="ticketInformation"></p>
+            </div>
+        </div>
+
+        <div class="submit_barcode">
+            <h2>Enter Barcode</h2>
+            <input type="text" id="barcodeInput" placeholder="Enter barcode">
+            <button onclick="submitBarcode()">Submit</button>
+
+            <p id="responseMessage"></p>
+        </div>
+    </div>
+
+
+    <script>
+        const API_BASE = "http://localhost:3000/api";
+
+        let selectedSeasonGlobal = null;
+        let selectedEventGlobal = null;
+
+        function selectEnvironment() {
+            const environmentDropdown = document.querySelector('#environment');
+
+            const selectedEnvironment = environmentDropdown.value;
+            console.log("Selected Environment: " + selectedEnvironment);
+
+            environmentDropdown.addEventListener('change', async (e) => {
+                const selectedEnvironment = e.target.value;
+                console.log("Selected Environment: " + selectedEnvironment);
+            });
+        }
+
+        function getTokenFromUrl() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get("token");
+        }
+
+        window.onload = function () {
+            const token = getTokenFromUrl();
+            localStorage.setItem("jwtToken", token);
+
+            if (token) {
+                console.log("Using existing token from URL:", token);
+                checkAPIConnection();
+                fetchSeasons();
+                selectedSeason();
+                selectedEvent();
+                selectedTickets();
+            } else {
+                console.log("No token found in URL. Generate a new one by submitting environment.");
+                selectEnvironment();
+            }
+
+            if (window.location.search.includes("?token=")) {
+                document.querySelectorAll('.set_institution_operator').forEach(el => el.style.display = 'none');
+                document.querySelector('.reset_environment').style.display = 'block';
+                document.querySelector('.api_selections').style.display = 'block';
+                document.getElementById("loader").style.display = 'none';
+            }
+        };
+
+        async function submitEnvironment() {
+            const institution = document.getElementById("institutionCode").value;
+            const operator = document.getElementById("operatorCode").value;
+            const password = document.getElementById("passwordCode").value;
+            const environment = document.getElementById("environment").value;
+
+            try {
+                const response = await fetch(`${API_BASE}/submit-environment`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ institution, operator, password, environment })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                console.log("Response from server:", result);
+
+                const token = result.token;
+
+                const newUrl = `${window.location.origin}${window.location.pathname}?token=${token}`;
+                window.history.pushState({}, "", newUrl);
+                location.reload();
+
+            } catch (error) {
+                console.error("API Error:", error);
+            }
+        }
+
+        async function checkAPIConnection() {
+            const token = localStorage.getItem("jwtToken");
+
+            if (!token) {
+                console.error("No JWT token found.");
+                alert("Authentication required. Please log in.");
+                return;
+            }
+
+            const loader = document.getElementById("loader");
+            const info = document.getElementById("info");
+            loader.style.display = "block";
+
+            try {
+                const response = await fetch(`${API_BASE}/checkConnection`, {
+                    method: "GET",
+                    headers: {
+                        "Authorization": `Bearer ${token}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API request failed with status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                console.log("Connection Successful:", result);
+
+                const successMessage = document.createElement("p");
+                successMessage.classList.add("success_message");
+                successMessage.textContent = "API Connection Successful! ✅";
+
+                const proceedButton = document.createElement("button");
+                proceedButton.classList.add("proceed");
+                proceedButton.textContent = "Proceed";
+
+                proceedButton.addEventListener("click", () => {
+                    document.getElementById("loader").style.display = "none";
+                });
+
+                info.appendChild(successMessage);
+                info.appendChild(proceedButton);
+
+            } catch (error) {
+                console.error("Connection Failed:", error);
+
+                const errorMessage = document.createElement("p");
+                errorMessage.classList.add("error_message");
+                errorMessage.textContent = "API Connection Failed! ❌";
+
+                const retryButton = document.createElement("a");
+                retryButton.classList.add("retry");
+                retryButton.textContent = "Retry";
+                retryButton.href = "file:///C:/Users/oudb/Coding/access_control/index.html";
+
+                info.appendChild(errorMessage);
+                info.appendChild(retryButton);
+            }
+        }
+
+        async function fetchSeasons() {
+            const token = localStorage.getItem("jwtToken");
+
+            try {
+                const response = await fetch(`${API_BASE}/seasons`, {
+                    method: "GET",
+                    headers: {
+                        "Authorization": `Bearer ${token}`
+                    }
+                });
+
+                const result = await response.json();
+                console.log("Seasons Data:", result);
+
+                const dropdown = document.getElementById("seasonDropdown");
+
+                if (result.statusCode === "success" && result.seasons.length > 0) {
+                    result.seasons.forEach(season => {
+                        const option = document.createElement("option");
+                        option.value = season.code;
+                        option.textContent = season.internalName;
+                        dropdown.appendChild(option);
+                    });
+                } else {
+                    dropdown.innerHTML = "<option value=''>No Products Found</option>";
+                }
+            } catch (error) {
+                console.error("Error fetching products:", error);
+            }
+        }
+
+        async function selectedSeason() {
+            document.querySelector('#seasonDropdown').addEventListener('change', async (e) => {
+                selectedSeasonGlobal = e.target.value;
+                const selectedSeason = e.target.value;
+                console.log("Selected Season: " + selectedSeason);
+                await fetchEvents(selectedSeason);
+                selectedEventGlobal = null;
+                await fetchTickets(selectedSeason);
+            });
+        }
+
+        async function fetchEvents(seasonCode) {
+            const token = localStorage.getItem("jwtToken");
+
+            try {
+                const response = await fetch(`${API_BASE}/products?seasonCode=${seasonCode}`, {
+                    method: "GET",
+                    headers: {
+                        "Authorization": `Bearer ${token}`
+                    }
+                });
+                const result = await response.json();
+                console.log("Events Data:", result);
+
+                const dropdown = document.getElementById("productDropdown");
+
+                if (result.statusCode === "success" && result.seasons.length > 0) {
+                    dropdown.innerHTML = "<option value=''>Select Event...</option>";
+                    result.seasons[0].products.forEach(product => {
+                        const option = document.createElement("option");
+                        option.value = product.code;
+                        option.textContent = product.internalName;
+                        dropdown.appendChild(option);
+                    });
+                } else {
+                    dropdown.innerHTML = "<option value=''>No Products Found</option>";
+                }
+            } catch (error) {
+                console.error("Error fetching products:", error);
+            }
+        }
+
+        async function selectedEvent() {
+            document.querySelector('#productDropdown').addEventListener('change', async (e) => {
+                selectedEventGlobal = e.target.value;
+                const selectedEvent = e.target.value;
+                console.log("Selected Event: " + selectedEvent);
+
+                if (selectedSeasonGlobal && selectedEvent) {
+                    await fetchTickets(selectedSeasonGlobal, selectedEvent);
+                }
+            });
+        }
+
+        async function fetchTickets(seasonCode, eventCode) {
+            const token = localStorage.getItem("jwtToken");
+
+            try {
+                const response = await fetch(`${API_BASE}/tickets?seasonCode=${seasonCode}&eventCode=${eventCode}`, {
+                    method: "GET",
+                    headers: {
+                        "Authorization": `Bearer ${token}`
+                    }
+                });
+                const result = await response.json();
+                console.log("Ticket Data:", result);
+
+                const dropdown = document.getElementById("ticketDropdown");
+
+                if (result.statusCode === "success" && result.accessControlListData && result.accessControlListData.accessControlListItems.length > 0) {
+                    dropdown.innerHTML = "<option value=''>Select Ticket...</option>";
+                    result.accessControlListData.accessControlListItems.forEach(ticket => {
+                        const option = document.createElement("option");
+                        option.value = ticket.barcode;
+                        option.textContent = `${ticket.barcode} - ${ticket.ticketState}`;
+                        dropdown.appendChild(option);
+                    });
+                } else {
+                    dropdown.innerHTML = "<option value=''>No Tickets Found</option>";
+                }
+            } catch (error) {
+                console.error("Error fetching tickets:", error);
+            }
+        }
+
+        async function selectedTickets() {
+            document.querySelector('#ticketDropdown').addEventListener('change', async (e) => {
+                const selectedTicket = e.target.value;
+                console.log("Selected Ticket: " + selectedTicket);
+
+                if (selectedSeasonGlobal && selectedEventGlobal) {
+                    await displayTicketInformation(selectedSeasonGlobal, selectedEventGlobal, selectedTicket);
+                }
+            });
+        }
+
+        async function displayTicketInformation(seasonCode, eventCode, barcode) {
+            const token = localStorage.getItem("jwtToken");
+
+            try {
+                const response = await fetch(`${API_BASE}/tickets?seasonCode=${seasonCode}&eventCode=${eventCode}`, {
+                    method: "GET",
+                    headers: {
+                        "Authorization": `Bearer ${token}`
+                    }
+                });
+                const result = await response.json();
+
+                const control_response = await fetch(`${API_BASE}/isControlled?barcode=${barcode}`, {
+                    method: "GET",
+                    headers: {
+                        "Authorization": `Bearer ${token}`
+                    }
+                });
+                const control_result = await control_response.json();
+
+                const ticketInformationDiv = document.getElementById('ticketDetails');
+                ticketInformationDiv.innerHTML = "";
+
+                if (result.statusCode === "success" && result.accessControlListData && result.accessControlListData.accessControlListItems.length > 0) {
+                    result.accessControlListData.accessControlListItems.forEach(ticket => {
+                        if (ticket.barcode === barcode) {
+                            const option = document.createElement("p");
+                            option.textContent = `${ticket.barcode} - ${ticket.ticketState}`;
+                            ticketInformationDiv.appendChild(option);
+
+                            const option1 = document.createElement("p");
+                            option1.textContent = `First Name: ${ticket.holderInfo.FIRSTNAME}`;
+                            ticketInformationDiv.appendChild(option1);
+
+                            const option2 = document.createElement("p");
+                            option2.textContent = `Last Name: ${ticket.holderInfo.LASTNAME}`;
+                            ticketInformationDiv.appendChild(option2);
+
+                            const controlStatus = document.createElement("p");
+                            if (control_result.statusCode === "success" && control_result.controlledTicketData.controlOperations.length > 0) {
+                                controlStatus.textContent = "Status: Controlled";
+                            } else {
+                                controlStatus.textContent = "Status: Not Controlled";
+                            }
+                            ticketInformationDiv.appendChild(controlStatus);
+                        }
+                    });
+                } else {
+                    ticketInformationDiv.innerHTML = "No Tickets Found";
+                }
+            } catch (error) {
+                console.error("Error fetching tickets:", error);
+            }
+        }
+
+        async function submitBarcode() {
+            const token = localStorage.getItem("jwtToken");
+            const barcode = document.getElementById("barcodeInput").value;
+
+            if (!barcode) {
+                document.getElementById("responseMessage").innerText = "Please enter a barcode.";
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/submit-barcode`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ barcode })
+                });
+
+                const result = await response.json();
+                document.getElementById("responseMessage").innerText = JSON.stringify(result, null, 2);
+            } catch (error) {
+                document.getElementById("responseMessage").innerText = "Error: Unable to reach API.";
+                console.error("API Error:", error);
+            }
+        }
+    </script>
+</body>
+
+</html>

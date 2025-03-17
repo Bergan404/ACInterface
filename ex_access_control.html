@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Integration</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+</head>
+<body>
+    <h2>Product Selection</h2>
+    <label for="productDropdown">Select Product:</label>
+    <select id="productDropdown">
+        <option value="">Loading...</option>
+    </select>
+
+    <h2>Enter Barcode</h2>
+    <input type="text" id="barcodeInput" placeholder="Enter barcode">
+    <button onclick="submitBarcode()">Submit</button>
+
+    <p id="responseMessage"></p>
+
+    <script>
+        // Config
+        const API_BASE = "https://stxus.pp-ws.secutix.com/tnci/backend-apis/externalAccessControlService";
+        const institution = "stxus";
+        const operator = "STXUS_OUDB";
+        const secretKey = "P@ssw0rd"; // Ideally, this should not be in the frontend
+
+        // Helper function: Convert string to Base64
+        function convertBase64EN(string) {
+            return CryptoJS.enc.Base64.stringify(CryptoJS.enc.Utf8.parse(string));
+        }
+
+        // Generate JWT Token
+        function createJWT() {
+            const iat = Math.floor(Date.now() / 1000);
+            const exp = iat + 30; // 30-second expiry
+            const header = JSON.stringify({ alg: "HS256", typ: "JWT" });
+            const payload = JSON.stringify({ sub: institution, aud: operator, exp, iat });
+
+            const encodedHeader = convertBase64EN(header);
+            const encodedPayload = convertBase64EN(payload);
+
+            const signature = CryptoJS.HmacSHA256(`${encodedHeader}.${encodedPayload}`, secretKey);
+            const encodedSignature = CryptoJS.enc.Base64.stringify(signature);
+
+            return `${encodedHeader}.${encodedPayload}.${encodedSignature}`;
+        }
+
+        // Fetch Product List on Page Load
+        async function fetchProducts() {
+            const jwtToken = createJWT();
+
+            try {
+                const response = await fetch(`${API_BASE}/v1_6/getAccessControlCatalog`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Access-Control-Allow-Origin": "*",
+                        "Authorization": `Bearer ${jwtToken}`
+                    },
+                    body: JSON.stringify({
+                        requestId: 0,
+                        seasonCode: "CBPLSS"
+                    })
+                });
+
+                const result = await response.json();
+
+                // Populate Dropdown
+                const dropdown = document.getElementById("productDropdown");
+                dropdown.innerHTML = "";
+
+                if (result.statusCode === "success" && result.seasons.length > 0) {
+                    result.seasons[0].products.forEach(product => {
+                        const option = document.createElement("option");
+                        option.value = product.code;
+                        option.textContent = product.internalName;
+                        dropdown.appendChild(option);
+                    });
+                } else {
+                    dropdown.innerHTML = "<option value=''>No Products Found</option>";
+                }
+
+            } catch (error) {
+                console.error("Error fetching products:", error);
+            }
+        }
+
+        // Submit Barcode with Selected Product
+        async function submitBarcode() {
+            const barcode = document.getElementById("barcodeInput").value;
+            const selectedProduct = document.getElementById("productDropdown").value;
+
+            if (!barcode) {
+                document.getElementById("responseMessage").innerText = "Please enter a barcode.";
+                return;
+            }
+            if (!selectedProduct) {
+                document.getElementById("responseMessage").innerText = "Please select a product.";
+                return;
+            }
+
+            const jwtToken = createJWT();
+
+            try {
+                const response = await fetch(`${API_BASE}/v1_5/importControlledTicket`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Access-Control-Allow-Origin": "*",
+                        "Authorization": `Bearer ${jwtToken}`
+                    },
+                    body: JSON.stringify({
+                        requestId: "1",
+                        controlledTickets: [{
+                            acIdentifier: "20190404125800",
+                            barcode: barcode,
+                            controlDate: new Date().toISOString(),
+                            controlResult: "OK",
+                            failureReason: "OK"
+                        }]
+                    })
+                });
+
+                const result = await response.json();
+                document.getElementById("responseMessage").innerText = JSON.stringify(result, null, 2);
+            } catch (error) {
+                document.getElementById("responseMessage").innerText = "Error: Unable to reach API.";
+                console.error("API Error:", error);
+            }
+        }
+
+        window.onload = fetchProducts;
+    </script>
+</body>
+</html>
