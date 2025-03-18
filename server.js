@@ -22,6 +22,7 @@ function createJWT(institution, operator, password) {
     const secretKey = password || process.env.SECRET_KEY;
     const iat = Math.floor(Date.now() / 1000);
     const exp = iat + 900;
+    // const exp = iat + 90;
     const payload = { sub: institution, aud: operator, iss: institution, exp, iat };
 
     return jwt.sign(payload, secretKey, { algorithm: 'HS256' });
@@ -156,14 +157,13 @@ app.get('/api/products', async (req, res) => {
 
 // **Route to fetch the Valid and Invalid tickets / Made dynamic **
 app.get('/api/tickets', async (req, res) => {
-    const { seasonCode, eventCode } = req.query;
-    if (!seasonCode && !eventCode) {
+    const { seasonCode, eventCode, environmentCode } = req.query;
+    if (!seasonCode && !eventCode && !environmentCode) {
         return res.status(400).json({ error: "Missing seasonCode parameter" });
     }
 
     const productCodes = Array.isArray(eventCode) ? eventCode : [eventCode];
 
-    // const token = tokenJWT;
     const token = req.headers.authorization?.split(" ")[1];
 
     if (!token) {
@@ -171,7 +171,8 @@ app.get('/api/tickets', async (req, res) => {
     }
     try {
         const response = await axios.post(`${API_BASE}/v1_6/exportList`, {
-            listType: "GREY",
+            // listType: "GREY",
+            listType: environmentCode,
             ticketType: "ALL",
             // seasonCode: "CBPLSS",
             seasonCode: seasonCode,
@@ -234,7 +235,7 @@ app.post('/api/submit-barcode', async (req, res) => {
         return res.status(401).json({ error: "Unauthorized: No JWT Token Provided" });
     }
     try {
-        const response = await axios.post(`${API_BASE}/v1_5/importControlledTicket`, {
+        const response = await axios.post(`${API_BASE}/v1_6/importControlledTicket`, {
             requestId: "1",
             controlledTickets: [{
                 acIdentifier: "20190404125800",

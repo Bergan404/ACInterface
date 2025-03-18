@@ -71,7 +71,7 @@
             <h2>All Ticket Selection</h2>
             <label for="ticketType">Ticket Type</label>
             <select id="ticketType">
-                <option value="GRAY">GRAY</option>
+                <option value="GREY">GREY</option>
                 <option value="BLACK">BLACK</option>
                 <option value="WHITE">WHITE</option>
             </select>
@@ -105,6 +105,7 @@
 
         let selectedSeasonGlobal = null;
         let selectedEventGlobal = null;
+        let selectedEnvironmentGlobal = null;
 
         function resetAuth() {
             localStorage.setItem("Authorized", "FALSE");
@@ -115,23 +116,12 @@
 
             const selectedEnvironment = environmentDropdown.value;
             console.log("Selected Environment: " + selectedEnvironment);
-
+            
             environmentDropdown.addEventListener('change', async (e) => {
                 const selectedEnvironment = e.target.value;
                 console.log("Selected Environment: " + selectedEnvironment);
             });
-        }
 
-        function ticketTypeSelector() {
-            const ticketTypeDropdown = document.querySelector('#ticketType');
-
-            const selectedEnvironment = ticketTypeDropdown.value;
-            console.log("Selected Environment: " + selectedEnvironment);
-
-            ticketTypeDropdown.addEventListener('change', async (e) => {
-                const selectedEnvironment = e.target.value;
-                console.log("Selected Environment: " + selectedEnvironment);
-            });
         }
 
         function getTokenFromUrl() {
@@ -185,6 +175,9 @@
 
                 if (remainingTime <= 0) {
                     document.getElementById("tokenTimer").textContent = "Token Expired!";
+                    localStorage.setItem("Authorized", "FALSE");
+                    localStorage.setItem("jwtToken", "null");
+                    window.location.href = 'file:///C:/Users/oudb/Coding/access_control/index.html';
                     clearInterval(countdownInterval);
                     return;
                 }
@@ -373,16 +366,35 @@
                 console.log("Selected Event: " + selectedEvent);
 
                 if (selectedSeasonGlobal && selectedEvent) {
-                    await fetchTickets(selectedSeasonGlobal, selectedEvent);
+                    await fetchTickets(selectedSeasonGlobal, selectedEvent, selectedEnvironmentGlobal);
                 }
             });
         }
 
-        async function fetchTickets(seasonCode, eventCode) {
+        function ticketTypeSelector() {
+            const ticketTypeDropdown = document.querySelector('#ticketType');
+
+            selectedEnvironmentGlobal = ticketTypeDropdown.value;
+            const selectedEnvironment = ticketTypeDropdown.value;
+            console.log("Selected Ticket Type: " + selectedEnvironment);
+            console.log("Selected Ticket Type GLOBAL: " + selectedEnvironmentGlobal);
+
+            ticketTypeDropdown.addEventListener('change', async (e) => {
+                selectedEnvironmentGlobal = e.target.value;
+                const selectedEnvironment = e.target.value;
+                console.log("Selected Ticket Type: " + selectedEnvironment);
+
+                if (selectedSeasonGlobal && selectedEventGlobal && selectedEnvironment) {
+                    fetchTickets(selectedSeasonGlobal, selectedEventGlobal, selectedEnvironment);
+                }
+            });
+        }
+
+        async function fetchTickets(seasonCode, eventCode, environmentCode) {
             const token = localStorage.getItem("jwtToken");
 
             try {
-                const response = await fetch(`${API_BASE}/tickets?seasonCode=${seasonCode}&eventCode=${eventCode}`, {
+                const response = await fetch(`${API_BASE}/tickets?seasonCode=${seasonCode}&eventCode=${eventCode}&environmentCode=${environmentCode}`, {
                     method: "GET",
                     headers: {
                         "Authorization": `Bearer ${token}`
@@ -414,17 +426,17 @@
                 const selectedTicket = e.target.value;
                 console.log("Selected Ticket: " + selectedTicket);
 
-                if (selectedSeasonGlobal && selectedEventGlobal) {
-                    await displayTicketInformation(selectedSeasonGlobal, selectedEventGlobal, selectedTicket);
+                if (selectedSeasonGlobal && selectedEventGlobal  && selectedEnvironmentGlobal) {
+                    await displayTicketInformation(selectedSeasonGlobal, selectedEventGlobal, selectedEnvironmentGlobal, selectedTicket);
                 }
             });
         }
 
-        async function displayTicketInformation(seasonCode, eventCode, barcode) {
+        async function displayTicketInformation(seasonCode, eventCode, environmentCode, barcode) {
             const token = localStorage.getItem("jwtToken");
 
             try {
-                const response = await fetch(`${API_BASE}/tickets?seasonCode=${seasonCode}&eventCode=${eventCode}`, {
+                const response = await fetch(`${API_BASE}/tickets?seasonCode=${seasonCode}&eventCode=${eventCode}&environmentCode=${environmentCode}`, {
                     method: "GET",
                     headers: {
                         "Authorization": `Bearer ${token}`
@@ -439,6 +451,7 @@
                     }
                 });
                 const control_result = await control_response.json();
+                console.log("Control Data:", control_result);
 
                 const ticketInformationDiv = document.getElementById('ticketDetails');
                 ticketInformationDiv.innerHTML = "";
