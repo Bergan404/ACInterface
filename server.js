@@ -259,6 +259,72 @@ app.post('/api/submit-barcode', async (req, res) => {
     }
 });
 
+// Route to burn a ticket
+app.get('/api/burnTicket', async (req, res) => {
+    const { barcode } = req.query;
+    if (!barcode) return res.status(400).json({ error: "Barcode is required" });
+
+    const token = req.headers.authorization?.split(" ")[1];
+
+    if (!token) {
+        return res.status(401).json({ error: "Unauthorized: No JWT Token Provided" });
+    }
+
+    try {
+        const response = await axios.post(`${API_BASE}/v1_6/burnTicket`, {
+            requestId: 0,
+            barCodeOrTaxNumber: barcode
+        }, {
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+            }
+        });
+
+        res.json(response.data);
+        console.log("Burn Ticket Was a Success");
+    } catch (error) {
+        console.error("Error burning ticket:", error);
+        res.status(500).json({ error: "Failed to burn ticket" });
+    }
+});
+
+// Route to Control a ticket
+app.get('/api/controlTicket', async (req, res) => {
+    const { barcode } = req.query;
+    if (!barcode) return res.status(400).json({ error: "Barcode is required" });
+
+    const token = req.headers.authorization?.split(" ")[1];
+
+    if (!token) {
+        return res.status(401).json({ error: "Unauthorized: No JWT Token Provided" });
+    }
+
+    try {
+        const response = await axios.post(`${API_BASE}/v1_6/importControlledTicket`, {
+            requestId: "1",
+            controlledTickets: [{
+                acIdentifier: "20190404125800",
+                barcode: barcode,
+                controlDate: new Date().toISOString(),
+                controlResult: "OK",
+                failureReason: "OK"
+            }]
+        }, {
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+            }
+        });
+
+        res.json(response.data);
+        console.log("Control Ticket Was a Success");
+    } catch (error) {
+        console.error("Error Controlling ticket:", error);
+        res.status(500).json({ error: "Failed to Control ticket" });
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
 });

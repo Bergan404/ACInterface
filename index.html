@@ -88,6 +88,7 @@
             <div id="ticketDetails">
                 <p id="ticketInformation"></p>
             </div>
+            <p id="control_burn_response"></p>
         </div>
 
         <div class="submit_barcode">
@@ -116,7 +117,7 @@
 
             const selectedEnvironment = environmentDropdown.value;
             console.log("Selected Environment: " + selectedEnvironment);
-            
+
             environmentDropdown.addEventListener('change', async (e) => {
                 const selectedEnvironment = e.target.value;
                 console.log("Selected Environment: " + selectedEnvironment);
@@ -426,7 +427,7 @@
                 const selectedTicket = e.target.value;
                 console.log("Selected Ticket: " + selectedTicket);
 
-                if (selectedSeasonGlobal && selectedEventGlobal  && selectedEnvironmentGlobal) {
+                if (selectedSeasonGlobal && selectedEventGlobal && selectedEnvironmentGlobal) {
                     await displayTicketInformation(selectedSeasonGlobal, selectedEventGlobal, selectedEnvironmentGlobal, selectedTicket);
                 }
             });
@@ -463,6 +464,10 @@
                             option.textContent = `${ticket.barcode} - ${ticket.ticketState}`;
                             ticketInformationDiv.appendChild(option);
 
+                            const optionID = document.createElement("p");
+                            optionID.textContent = `ID: ${ticket.fileId}`;
+                            ticketInformationDiv.appendChild(optionID);
+
                             const option1 = document.createElement("p");
                             option1.textContent = `First Name: ${ticket.holderInfo.FIRSTNAME}`;
                             ticketInformationDiv.appendChild(option1);
@@ -472,12 +477,45 @@
                             ticketInformationDiv.appendChild(option2);
 
                             const controlStatus = document.createElement("p");
+                            let isControlled = false;
                             if (control_result.statusCode === "success" && control_result.controlledTicketData.controlOperations.length > 0) {
-                                controlStatus.textContent = "Status: Controlled";
+                                isControlled = true;
+
+                                if (control_result.controlledTicketData.controlOperations[0].controlOperationType === "FAIL") {
+                                    controlStatus.textContent = "Status: Burned";
+                                }
+
+                                if (control_result.controlledTicketData.controlOperations[0].controlOperationType === "OK") {
+                                    controlStatus.textContent = "Status: Controlled";
+                                }
                             } else {
                                 controlStatus.textContent = "Status: Not Controlled";
                             }
                             ticketInformationDiv.appendChild(controlStatus);
+
+                            const controlButton = document.createElement("button");
+                            controlButton.textContent = "Control";
+                            controlButton.disabled = isControlled;
+                            controlButton.classList.add("control_button");
+                            controlButton.style.backgroundColor = isControlled ? "#ccc" : "#28a745";
+                            controlButton.style.cursor = isControlled ? "not-allowed" : "pointer";
+
+                            if (!isControlled) {
+                                controlButton.addEventListener("click", async () => {
+                                    await controlTicket(barcode);
+                                });
+                            }
+
+                            const burnButton = document.createElement("button");
+                            burnButton.textContent = "Burn";
+                            burnButton.classList.add("burn_button");
+
+                            burnButton.addEventListener("click", async () => {
+                                await burnTicket(barcode);
+                            });
+
+                            ticketInformationDiv.appendChild(controlButton);
+                            ticketInformationDiv.appendChild(burnButton);
                         }
                     });
                 } else {
@@ -485,6 +523,70 @@
                 }
             } catch (error) {
                 console.error("Error fetching tickets:", error);
+            }
+        }
+
+        async function controlTicket(barcode) {
+            const controlBurn = document.getElementById("control_burn_response");
+            const token = localStorage.getItem("jwtToken");
+
+            try {
+
+                const response = await fetch(`${API_BASE}/controlTicket?barcode=${barcode}`, {
+                    method: "GET",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${token}`
+                    },
+                });
+
+                const result = await response.json();
+                console.log(result);
+                await displayTicketInformation(selectedSeasonGlobal, selectedEventGlobal, selectedEnvironmentGlobal, barcode);
+                controlBurn.textContent = "Ticket was Controlled Successfully ✅";
+
+                setTimeout(() => {
+                    controlBurn.textContent = "";
+                }, 5000);
+            } catch (error) {
+                controlBurn.textContent = "Failed to Control Ticket ❌";
+                console.error("API Error:", error);
+
+                setTimeout(() => {
+                    controlBurn.textContent = "";
+                }, 5000);
+            }
+        }
+
+        async function burnTicket(barcode) {
+            const controlBurn = document.getElementById("control_burn_response");
+            const token = localStorage.getItem("jwtToken");
+
+            try {
+
+                const response = await fetch(`${API_BASE}/burnTicket?barcode=${barcode}`, {
+                    method: "GET",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${token}`
+                    },
+                });
+
+                const result = await response.json();
+                console.log(result);
+                await displayTicketInformation(selectedSeasonGlobal, selectedEventGlobal, selectedEnvironmentGlobal, barcode);
+                controlBurn.textContent = "Ticket was Burned Successfully ✅";
+
+                setTimeout(() => {
+                    controlBurn.textContent = "";
+                }, 5000);
+            } catch (error) {
+                controlBurn.textContent = "Failed to Burn Ticket ❌";
+                console.error("API Error:", error);
+
+                setTimeout(() => {
+                    controlBurn.textContent = "";
+                }, 5000);
             }
         }
 

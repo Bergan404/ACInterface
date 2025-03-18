@@ -79,6 +79,21 @@ a {
     font-weight: 600;
 }
 
+.control_button {
+    color: #fff;
+    margin-right: 10px;
+    padding: 10px;
+    border: none;
+}
+
+.burn_button {
+    background-color: #dc3545;
+    color: #fff;
+    padding: 10px;
+    border: none;
+    cursor: pointer;
+}
+
 @keyframes spin {
     0% { transform: translate(-50%, -50%) rotate(0deg); }
     100% { transform: translate(-50%, -50%) rotate(360deg); }
